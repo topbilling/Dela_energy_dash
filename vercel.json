@@ -1,6 +1,12 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/tesla/auth",
+      "destination": "/api/tesla/auth"
+    }
+  ],
   "headers": [
     {
       "source": "/.well-known/appspecific/(.*)",
