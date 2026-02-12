@@ -1,97 +1,102 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
 
-export default function Dashboard() {
-  const [energy, setEnergy] = useState(null);
+export default function Home() {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Function to fetch data
-  const fetchEnergy = async () => {
+  const fetchData = async () => {
     try {
+      setLoading(true);
       const res = await fetch('/api/tesla/energy');
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setEnergy(data);
+      if (!res.ok) throw new Error('Failed to fetch data');
+      const jsonData = await res.json();
+      setData(jsonData);
       setError(null);
     } catch (err) {
-      console.error(err);
-      setError('Connection Lost');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch on load and refresh every 60 seconds
+  // Fetch on load AND every 60 seconds
   useEffect(() => {
-    fetchEnergy();
-    const interval = setInterval(fetchEnergy, 60000);
+    fetchData();
+    const interval = setInterval(fetchData, 60000); 
     return () => clearInterval(interval);
   }, []);
 
-  // Determine Battery Color
-  const getBatteryColor = (level) => {
-    if (level > 50) return '#10b981'; // Green
-    if (level > 20) return '#f59e0b'; // Orange
-    return '#ef4444'; // Red
-  };
+  // Format the date nicely
+  const formattedTime = data?.timestamp 
+    ? new Date(data.timestamp).toLocaleString('en-US', {
+        month: 'short', 
+        day: 'numeric', 
+        hour: 'numeric', 
+        minute: '2-digit'
+      })
+    : '';
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#111', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <Head>
-        <title>Dela Energy Dash</title>
-      </Head>
+    <div style={{ 
+      fontFamily: 'sans-serif', 
+      textAlign: 'center', 
+      padding: '50px',
+      backgroundColor: '#111', 
+      color: '#fff',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      <h1 style={{ fontSize: '24px', color: '#888', marginBottom: '10px' }}>
+        Possum Hollow Energy
+      </h1>
 
-      <main style={{ textAlign: 'center', padding: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '2rem', opacity: 0.8 }}>Possum Hollow Energy</h1>
+      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+      
+      {loading && !data && <p>Loading Powerwall...</p>}
 
-        {loading ? (
-          <p>Connecting to Tesla...</p>
-        ) : error ? (
-          <div style={{ color: '#ef4444' }}>⚠️ {error}</div>
-        ) : (
+      {data && (
+        <>
+          {/* Big Percentage */}
           <div style={{ 
-            border: '2px solid #333', 
-            borderRadius: '20px', 
-            padding: '3rem', 
-            background: '#222',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-            minWidth: '300px'
+            fontSize: '120px', 
+            fontWeight: 'bold', 
+            color: data.battery_level > 20 ? '#4CAF50' : '#f44336',
+            lineHeight: '1'
           }}>
-            
-            {/* Battery Icon & Percentage */}
-            <div style={{ fontSize: '5rem', fontWeight: 'bold', color: getBatteryColor(energy.battery_level) }}>
-              {energy.battery_level}%
-            </div>
-            
-            <div style={{ fontSize: '1.2rem', marginTop: '1rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px' }}>
-              {energy.status}
-            </div>
-
-            {/* Last Updated Timestamp */}
-            <div style={{ marginTop: '2rem', fontSize: '0.8rem', color: '#555' }}>
-              Updated: {new Date().toLocaleTimeString()}
-            </div>
-
-            {/* Manual Refresh Button */}
-            <button 
-              onClick={() => { setLoading(true); fetchEnergy(); }}
-              style={{
-                marginTop: '2rem',
-                padding: '10px 20px',
-                background: '#333',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9rem'
-              }}
-            >
-              Refresh Now
-            </button>
+            {Math.round(data.battery_level)}%
           </div>
-        )}
-      </main>
+
+          {/* Status (Charging/Standby) */}
+          <p style={{ fontSize: '24px', margin: '20px 0', color: '#ccc' }}>
+            {data.status}
+          </p>
+
+          {/* The New Timestamp */}
+          <p style={{ fontSize: '14px', color: '#666', marginTop: '40px' }}>
+            Last updated: {formattedTime}
+          </p>
+        </>
+      )}
+      
+      {/* Manual Refresh Button */}
+      <button 
+        onClick={fetchData}
+        style={{
+          marginTop: '20px',
+          padding: '10px 20px',
+          background: 'transparent',
+          border: '1px solid #444',
+          color: '#888',
+          borderRadius: '5px',
+          cursor: 'pointer'
+        }}
+      >
+        Refresh Now
+      </button>
     </div>
   );
 }
