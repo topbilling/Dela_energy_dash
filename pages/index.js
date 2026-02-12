@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
 
+// --- KNICKS COLOR PALETTE ---
+const COLORS = {
+  blue: '#006BB6',      // Official Knicks Blue
+  orange: '#F58426',    // Official Knicks Orange
+  white: '#FFFFFF',
+  silver: '#BEC0C2',
+  bg: '#0B162A',        // Deep Navy Background
+  panel: '#15243b',     // Slightly lighter navy for boxes
+  danger: '#FF3B30'     // Keep Red for "Low Battery" warnings
+};
+
 export default function Home() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState(null);
@@ -54,37 +65,33 @@ export default function Home() {
 
   const kw = (watts) => (Math.abs(watts) / 1000).toFixed(1) + ' kW';
 
-  // --- Logic for Graph (Fixed for Time-Based X-Axis) ---
+  // --- Logic for Graph ---
   const renderGraph = () => {
     if (!history || history.length === 0) return <p>Loading Graph...</p>;
 
     const width = 300;
     const height = 100;
     
-    // 1. Get Midnight Timestamp for anchoring X-Axis
+    // 1. Get Midnight Timestamp
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const totalDayMillis = 24 * 60 * 60 * 1000; // 24 hours in ms
+    const totalDayMillis = 24 * 60 * 60 * 1000;
 
-    // 2. Calculate Scales
+    // 2. Scales
     const maxSolar = Math.max(...history.map(d => d.solar_power), 8000); 
 
-    // Helper to get X position based on Time (not index)
     const getX = (timestampStr) => {
       const time = new Date(timestampStr).getTime();
       const diff = time - startOfDay;
-      // Clamp between 0 and width
       let x = (diff / totalDayMillis) * width;
-      if (x < 0) x = 0; 
-      if (x > width) x = width;
+      if (x < 0) x = 0; if (x > width) x = width;
       return x;
     };
 
-    // 3. Solar Path (Actual Data)
-    // We filter out any data points not from "Today" just in case API returns overlapping days
+    // 3. Solar Path (ORANGE)
     const todaysPoints = history.filter(d => new Date(d.timestamp).getTime() >= startOfDay);
 
-    if (todaysPoints.length === 0) return <p style={{fontSize:'10px'}}>Waiting for sunrise...</p>;
+    if (todaysPoints.length === 0) return <p style={{fontSize:'10px', color: COLORS.silver}}>Waiting for tip-off...</p>;
 
     const solarPoints = todaysPoints.map(d => {
       const x = getX(d.timestamp);
@@ -92,18 +99,15 @@ export default function Home() {
       return `${x},${y}`;
     }).join(' ');
 
-    // Close the area shape
-    // Start at bottom-left of first point, end at bottom-right of last point
     const firstX = getX(todaysPoints[0].timestamp);
     const lastX = getX(todaysPoints[todaysPoints.length - 1].timestamp);
     const solarAreaPath = `${firstX},${height} ${solarPoints} ${lastX},${height} Z`;
 
-    // 4. Irradiance Path (Forecast)
+    // 4. Irradiance Path (WHITE Dotted)
     let irradiancePath = null;
     if (irradiance && irradiance.hourly_ghi) {
       const ghiData = irradiance.hourly_ghi;
-      const maxGHI = 1000; // Scale GHI to match graph height roughly
-      
+      const maxGHI = 1000; 
       irradiancePath = ghiData.map(d => {
         const x = getX(d.timestamp);
         const y = height - (d.ghi / maxGHI) * height; 
@@ -114,38 +118,38 @@ export default function Home() {
     return (
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{overflow: 'visible'}}>
         <defs>
-          <linearGradient id="solarGradient" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#FFD700" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#FFD700" stopOpacity="0.0" />
+          <linearGradient id="knicksGradient" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={COLORS.orange} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={COLORS.orange} stopOpacity="0.1" />
           </linearGradient>
         </defs>
 
-        {/* The Solar Area (Gold) */}
-        <path d={solarAreaPath} fill="url(#solarGradient)" />
-        <polyline points={solarPoints} fill="none" stroke="#FFD700" strokeWidth="2" />
+        {/* Solar Area (Orange) */}
+        <path d={solarAreaPath} fill="url(#knicksGradient)" />
+        <polyline points={solarPoints} fill="none" stroke={COLORS.orange} strokeWidth="2" />
 
-        {/* The Irradiance Line (White Dotted) */}
+        {/* Irradiance Line (White/Silver) */}
         {irradiancePath && (
           <polyline 
             points={irradiancePath} 
             fill="none" 
-            stroke="#FFFFFF" 
+            stroke={COLORS.silver} 
             strokeWidth="1.5" 
             strokeDasharray="4,4" 
-            opacity="0.5"
+            opacity="0.6"
           />
         )}
         
-        {/* Optional: Add a faint 'Noon' marker line */}
-        <line x1={width/2} y1="0" x2={width/2} y2={height} stroke="#333" strokeDasharray="2,2" />
+        {/* Noon Marker */}
+        <line x1={width/2} y1="0" x2={width/2} y2={height} stroke={COLORS.blue} strokeDasharray="2,2" opacity="0.5" />
       </svg>
     );
   };
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Possum Hollow Energy</h1>
-      <p style={styles.timestamp}>Last update: {new Date(data.timestamp).toLocaleTimeString()}</p>
+      <h1 style={styles.title}>POSSUM HOLLOW</h1>
+      <p style={styles.timestamp}>LAST UPDATE: {new Date(data.timestamp).toLocaleTimeString().toUpperCase()}</p>
 
       {/* --- POWER FLOW DIAGRAM --- */}
       <div style={styles.diagram}>
@@ -153,70 +157,83 @@ export default function Home() {
         {/* IRRADIANCE MODULE */}
         {irradiance && (
           <div style={{ position: 'absolute', top: '15px', left: '15px', textAlign: 'left', zIndex: 5 }}>
-            <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Sky Intensity</span>
-            <div style={{ fontSize: '18px', color: '#FFD700', fontWeight: 'bold' }}>
+            <span style={{ fontSize: '10px', color: COLORS.silver, textTransform: 'uppercase', letterSpacing: '1px' }}>SKY INTENSITY</span>
+            <div style={{ fontSize: '18px', color: COLORS.white, fontWeight: 'bold' }}>
               {Math.round(irradiance.current_ghi)} W/m²
             </div>
-            <div style={{ fontSize: '10px', color: '#555' }}>
-               {irradiance.current_ghi > 800 ? "Peak Sun" : irradiance.current_ghi > 200 ? "Cloudy/Mixed" : "Low Light"}
+            <div style={{ fontSize: '10px', color: COLORS.orange }}>
+               {irradiance.current_ghi > 800 ? "PEAK SUN" : irradiance.current_ghi > 200 ? "CLOUDY" : "LOW LIGHT"}
             </div>
           </div>
         )}
 
-        {/* SOLAR */}
-        <div style={{...styles.node, top: '0', left: '50%', transform: 'translateX(-50%)'}}>
-          <span style={styles.icon}>☀️</span>
-          <div style={styles.value}>{kw(data.solar_power)}</div>
-          <div style={styles.label}>Solar</div>
+        {/* SOLAR (Orange) */}
+        <div style={{...styles.node, top: '0', left: '50%', transform: 'translateX(-50%)', borderColor: COLORS.orange}}>
+          <span style={styles.icon}>🏀</span>
+          <div style={{...styles.value, color: COLORS.orange}}>{kw(data.solar_power)}</div>
+          <div style={styles.label}>SOLAR</div>
         </div>
 
-        {/* HOUSE */}
-        <div style={{...styles.node, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10}}>
+        {/* HOUSE (White) */}
+        <div style={{...styles.node, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, borderColor: COLORS.white}}>
           <span style={styles.icon}>🏠</span>
           <div style={styles.value}>{kw(data.load_power)}</div>
-          <div style={styles.label}>Home</div>
+          <div style={styles.label}>HOME</div>
         </div>
 
-        {/* GRID */}
-        <div style={{...styles.node, top: '50%', left: '10%', transform: 'translateY(-50%)'}}>
+        {/* GRID (Blue) */}
+        <div style={{...styles.node, top: '50%', left: '10%', transform: 'translateY(-50%)', borderColor: COLORS.blue}}>
           <span style={styles.icon}>⚡</span>
-          <div style={styles.value}>{kw(data.grid_power)}</div>
-          <div style={styles.label}>{isGridExporting ? 'Exporting' : 'Grid'}</div>
+          <div style={{...styles.value, color: COLORS.blue}}>{kw(data.grid_power)}</div>
+          <div style={styles.label}>{isGridExporting ? 'EXPORTING' : 'GRID'}</div>
         </div>
 
-        {/* BATTERY */}
-        <div style={{...styles.node, top: '50%', right: '10%', transform: 'translateY(-50%)'}}>
-          <span style={{...styles.icon, color: data.battery_level > 20 ? '#4CAF50' : 'red'}}>🔋</span>
-          <div style={styles.value}>{Math.round(data.battery_level)}%</div>
-          <div style={styles.label}>{isBatteryCharging ? 'Charging' : isBatteryDischarging ? 'Draining' : 'Standby'}</div>
+        {/* BATTERY (Blue/Orange Logic) */}
+        <div style={{...styles.node, top: '50%', right: '10%', transform: 'translateY(-50%)', borderColor: data.battery_level > 20 ? COLORS.blue : COLORS.danger}}>
+          <span style={styles.icon}>🔋</span>
+          <div style={{...styles.value, color: data.battery_level > 20 ? COLORS.blue : COLORS.danger}}>
+            {Math.round(data.battery_level)}%
+          </div>
+          <div style={styles.label}>
+            {isBatteryCharging ? 'CHARGING' : isBatteryDischarging ? 'DRAINING' : 'STANDBY'}
+          </div>
         </div>
 
         <svg style={styles.svg}>
-          {isSolarProducing && <line x1="50%" y1="15%" x2="50%" y2="40%" stroke="#FFD700" strokeWidth="4" className="flow-line" />}
-          {isGridImporting && <line x1="20%" y1="50%" x2="40%" y2="50%" stroke="#888" strokeWidth="4" className="flow-line" />}
-          {isGridExporting && <line x1="40%" y1="50%" x2="20%" y2="50%" stroke="#4CAF50" strokeWidth="4" className="flow-line-reverse" />}
-          {isBatteryDischarging && <line x1="80%" y1="50%" x2="60%" y2="50%" stroke="#4CAF50" strokeWidth="4" className="flow-line-reverse" />}
-          {isBatteryCharging && <line x1="60%" y1="50%" x2="80%" y2="50%" stroke="#4CAF50" strokeWidth="4" className="flow-line" />}
+          {/* Solar -> House (Orange) */}
+          {isSolarProducing && <line x1="50%" y1="15%" x2="50%" y2="40%" stroke={COLORS.orange} strokeWidth="4" className="flow-line" />}
+          
+          {/* Grid -> House (Blue) */}
+          {isGridImporting && <line x1="20%" y1="50%" x2="40%" y2="50%" stroke={COLORS.blue} strokeWidth="4" className="flow-line" />}
+          
+          {/* House -> Grid (Orange - Selling back!) */}
+          {isGridExporting && <line x1="40%" y1="50%" x2="20%" y2="50%" stroke={COLORS.orange} strokeWidth="4" className="flow-line-reverse" />}
+          
+          {/* Battery -> House (Orange - Powering from storage) */}
+          {isBatteryDischarging && <line x1="80%" y1="50%" x2="60%" y2="50%" stroke={COLORS.orange} strokeWidth="4" className="flow-line-reverse" />}
+          
+          {/* Grid/Solar -> Battery (Blue - Charging up) */}
+          {isBatteryCharging && <line x1="60%" y1="50%" x2="80%" y2="50%" stroke={COLORS.blue} strokeWidth="4" className="flow-line" />}
         </svg>
       </div>
 
       {/* --- SOLAR GRAPH MODULE --- */}
       <div style={styles.graphContainer}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-          <h3 style={{color: '#888', margin: 0, fontSize: '14px'}}>Solar Output (24h)</h3>
-          <div style={{fontSize:'10px', color:'#555'}}>
-             <span style={{color:'#FFD700', marginRight:'10px'}}>— Actual</span>
-             <span style={{color:'#999'}}>--- Sky Potential</span>
+          <h3 style={{color: COLORS.silver, margin: 0, fontSize: '14px', letterSpacing: '1px'}}>SOLAR OUTPUT (24H)</h3>
+          <div style={{fontSize:'10px', color: COLORS.silver}}>
+             <span style={{color: COLORS.orange, marginRight:'10px'}}>— ACTUAL</span>
+             <span style={{color: COLORS.white}}>--- POTENTIAL</span>
           </div>
         </div>
         
-        <div style={{width: '100%', height: '100px', borderBottom: '1px solid #333'}}>
+        <div style={{width: '100%', height: '100px', borderBottom: `1px solid ${COLORS.blue}`}}>
            {renderGraph()}
         </div>
-        <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '10px', color: '#555', marginTop: '5px'}}>
-          <span>Midnight</span>
-          <span>Noon</span>
-          <span>Now</span>
+        <div style={{display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '10px', color: COLORS.blue, marginTop: '5px'}}>
+          <span>MIDNIGHT</span>
+          <span>NOON</span>
+          <span>NOW</span>
         </div>
       </div>
 
@@ -224,6 +241,7 @@ export default function Home() {
         @keyframes flow { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
         .flow-line { stroke-dasharray: 10; animation: flow 1s linear infinite; }
         .flow-line-reverse { stroke-dasharray: 10; animation: flow 1s linear infinite reverse; }
+        body { background-color: ${COLORS.bg}; margin: 0; }
       `}</style>
     </div>
   );
@@ -231,26 +249,58 @@ export default function Home() {
 
 const styles = {
   container: {
-    backgroundColor: '#111', color: '#eee', minHeight: '100vh', fontFamily: 'sans-serif',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px',
+    backgroundColor: COLORS.bg, 
+    color: COLORS.white, 
+    minHeight: '100vh', 
+    fontFamily: 'Helvetica Neue, Arial, sans-serif', // Clean, sporty font
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    padding: '20px',
   },
-  title: { color: '#888', fontSize: '20px', marginBottom: '5px' },
-  timestamp: { color: '#555', fontSize: '12px', marginBottom: '40px' },
+  title: { 
+    color: COLORS.white, 
+    fontSize: '24px', 
+    marginBottom: '5px', 
+    fontWeight: '900', 
+    letterSpacing: '2px',
+    textShadow: `2px 2px 0px ${COLORS.blue}` // 3D Effect
+  },
+  timestamp: { color: COLORS.silver, fontSize: '12px', marginBottom: '40px', letterSpacing: '1px' },
   diagram: {
-    position: 'relative', width: '100%', maxWidth: '500px', height: '300px',
-    border: '1px solid #222', borderRadius: '20px', backgroundColor: '#1a1a1a', marginBottom: '20px'
+    position: 'relative', 
+    width: '100%', 
+    maxWidth: '500px', 
+    height: '300px',
+    border: `2px solid ${COLORS.blue}`, 
+    borderRadius: '10px', 
+    backgroundColor: COLORS.panel, 
+    marginBottom: '20px',
+    boxShadow: `0 0 15px ${COLORS.blue}40` // Blue Glow
   },
   node: {
-    position: 'absolute', textAlign: 'center', backgroundColor: '#222', padding: '10px',
-    borderRadius: '10px', border: '1px solid #333', minWidth: '80px',
+    position: 'absolute', 
+    textAlign: 'center', 
+    backgroundColor: COLORS.bg, 
+    padding: '10px',
+    borderRadius: '8px', 
+    borderWidth: '2px',
+    borderStyle: 'solid',
+    minWidth: '80px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
   },
   icon: { fontSize: '24px', display: 'block', marginBottom: '5px' },
-  value: { fontSize: '16px', fontWeight: 'bold', color: '#fff' },
-  label: { fontSize: '10px', color: '#888' },
+  value: { fontSize: '18px', fontWeight: 'bold', color: COLORS.white },
+  label: { fontSize: '10px', color: COLORS.silver, fontWeight: 'bold', letterSpacing: '0.5px' },
   svg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' },
   
   graphContainer: {
-    width: '100%', maxWidth: '500px', padding: '20px', backgroundColor: '#1a1a1a',
-    borderRadius: '20px', border: '1px solid #222'
+    width: '100%', 
+    maxWidth: '500px', 
+    padding: '20px', 
+    backgroundColor: COLORS.panel,
+    borderRadius: '10px', 
+    border: `2px solid ${COLORS.orange}`, // Orange Border for Graph
+    boxShadow: `0 0 15px ${COLORS.orange}40` // Orange Glow
   }
 };
