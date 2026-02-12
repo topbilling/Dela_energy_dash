@@ -1,98 +1,97 @@
-import React, { useState, useEffect } from 'react';
-import { Sun, BatteryCharging, Zap, Home } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Head from 'next/head';
 
-const EnergyDashboard = () => {
-  const [data, setData] = useState(null);
+export default function Dashboard() {
+  const [energy, setEnergy] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Function to fetch data
+  const fetchEnergy = async () => {
+    try {
+      const res = await fetch('/api/tesla/energy');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setEnergy(data);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError('Connection Lost');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch on load and refresh every 60 seconds
   useEffect(() => {
-    // This calls the API route you just created in pages/api/tesla/status.js
-    const getEnergyData = async () => {
-      try {
-        // In a real flow, you'd pass your token/site_id here
-        const response = await fetch('/api/tesla/status?site_id=2715465');
-        const result = await response.json();
-        setData(result);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching PowerWall data:", error);
-        setLoading(false);
-      }
-    };
-
-    getEnergyData();
-    // Refresh every 5 minutes to stay well within the $10 Tesla credit
-    const interval = setInterval(getEnergyData, 300000); 
+    fetchEnergy();
+    const interval = setInterval(fetchEnergy, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Initializing Energy Command...</div>;
+  // Determine Battery Color
+  const getBatteryColor = (level) => {
+    if (level > 50) return '#10b981'; // Green
+    if (level > 20) return '#f59e0b'; // Orange
+    return '#ef4444'; // Red
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8 font-sans">
-      <header className="mb-10 flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-            Residant Energy Command
-          </h1>
-          <p className="text-slate-400 text-sm">Delaplane, VA • 10.8 kW System</p>
-        </div>
-        <div className="text-right">
-          <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">System Status</span>
-          <div className="text-green-400 font-bold">ONLINE</div>
-        </div>
-      </header>
+    <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#111', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <Head>
+        <title>Dela Energy Dash</title>
+      </Head>
 
-      {/* Real-Time Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <StatCard 
-          icon={<Sun className="text-yellow-400" />} 
-          label="Solar Production" 
-          value={`${(data?.solar_power / 1000 || 0).toFixed(1)} kW`} 
-          sub="Live PV Generation" 
-        />
-        <StatCard 
-          icon={<BatteryCharging className="text-green-400" />} 
-          label="PowerWall" 
-          value={`${data?.percentage_charged.toFixed(0) || 0}%`} 
-          sub={data?.battery_power > 0 ? "Charging" : "Discharging"} 
-        />
-        <StatCard 
-          icon={<Home className="text-blue-400" />} 
-          label="Home Load" 
-          value={`${(data?.load_power / 1000 || 0).toFixed(1)} kW`} 
-          sub="Lumin Panel Active" 
-        />
-        <StatCard 
-          icon={<Zap className="text-purple-400" />} 
-          label="Grid Net" 
-          value={`${(data?.grid_power / 1000 || 0).toFixed(1)} kW`} 
-          sub={data?.grid_power < 0 ? "Exporting to Dominion" : "Importing"} 
-        />
-      </div>
+      <main style={{ textAlign: 'center', padding: '2rem' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '2rem', opacity: 0.8 }}>Possum Hollow Energy</h1>
 
-      {/* The Visual "Vibe" - Interactive Flow */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-12 flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-blue-500/5 opacity-20 animate-pulse" />
-        <p className="text-slate-500 font-mono text-xs uppercase mb-4 z-10">Energy Flow Visualization</p>
-        <div className="text-center z-10">
-           <div className="text-6xl font-bold mb-2">{(data?.solar_power / 1000 || 0).toFixed(1)} <span className="text-2xl text-slate-500 text-slate-500 uppercase">kW</span></div>
-           <p className="text-orange-400 font-medium tracking-wide">Solar is powering {(((data?.solar_power - data?.grid_power) / data?.load_power) * 100 || 0).toFixed(0)}% of your home</p>
-        </div>
-      </div>
+        {loading ? (
+          <p>Connecting to Tesla...</p>
+        ) : error ? (
+          <div style={{ color: '#ef4444' }}>⚠️ {error}</div>
+        ) : (
+          <div style={{ 
+            border: '2px solid #333', 
+            borderRadius: '20px', 
+            padding: '3rem', 
+            background: '#222',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            minWidth: '300px'
+          }}>
+            
+            {/* Battery Icon & Percentage */}
+            <div style={{ fontSize: '5rem', fontWeight: 'bold', color: getBatteryColor(energy.battery_level) }}>
+              {energy.battery_level}%
+            </div>
+            
+            <div style={{ fontSize: '1.2rem', marginTop: '1rem', color: '#888', textTransform: 'uppercase', letterSpacing: '2px' }}>
+              {energy.status}
+            </div>
+
+            {/* Last Updated Timestamp */}
+            <div style={{ marginTop: '2rem', fontSize: '0.8rem', color: '#555' }}>
+              Updated: {new Date().toLocaleTimeString()}
+            </div>
+
+            {/* Manual Refresh Button */}
+            <button 
+              onClick={() => { setLoading(true); fetchEnergy(); }}
+              style={{
+                marginTop: '2rem',
+                padding: '10px 20px',
+                background: '#333',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              Refresh Now
+            </button>
+          </div>
+        )}
+      </main>
     </div>
   );
-};
-
-const StatCard = ({ icon, label, value, sub }) => (
-  <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl hover:border-orange-500/30 transition-all cursor-default group">
-    <div className="flex items-center gap-3 mb-4">
-      {icon}
-      <span className="text-sm font-medium text-slate-400 uppercase tracking-wider group-hover:text-slate-200">{label}</span>
-    </div>
-    <div className="text-3xl font-bold mb-1 font-mono">{value}</div>
-    <div className="text-xs text-slate-500 font-medium">{sub}</div>
-  </div>
-);
-
-export default EnergyDashboard;
+}
