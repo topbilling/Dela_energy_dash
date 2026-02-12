@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 export default function Home() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState(null);
-  const [irradiance, setIrradiance] = useState(null); // <--- NEW STATE
+  const [irradiance, setIrradiance] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -20,8 +20,7 @@ export default function Home() {
         if (histRes.ok) setHistory(histJson.solarData);
       }
 
-      // 3. Fetch Irradiance Data (NEW)
-      // We wrap this in its own try/catch so weather errors don't break the energy dash
+      // 3. Fetch Irradiance Data (Includes Hourly Forecast)
       try {
         const weatherRes = await fetch('/api/weather/irradiance');
         const weatherJson = await weatherRes.json();
@@ -62,31 +61,61 @@ export default function Home() {
 
     const width = 300;
     const height = 100;
-    const maxSolar = Math.max(...history.map(d => d.solar_power), 1000); // Dynamic Max
     
-    // Generate SVG path
-    const points = history.map((d, i) => {
+    // 1. Calculate Scales
+    // We want the graph to scale to whichever is higher: Your production or 10kW (default min)
+    const maxSolar = Math.max(...history.map(d => d.solar_power), 8000); 
+    
+    // 2. Solar Path (The Gold Area)
+    const solarPoints = history.map((d, i) => {
+      // Assuming history is 15-min intervals (96 points/day)
       const x = (i / (history.length - 1)) * width;
       const y = height - (d.solar_power / maxSolar) * height;
       return `${x},${y}`;
     }).join(' ');
+    const solarAreaPath = `0,${height} ${solarPoints} ${width},${height} Z`;
 
-    // Area path (closed at bottom)
-    const areaPath = `0,${height} ${points} ${width},${height} Z`;
+    // 3. Irradiance Path (The White Dotted Line)
+    let irradiancePath = null;
+    if (irradiance && irradiance.hourly_ghi) {
+      const ghiData = irradiance.hourly_ghi;
+      // GHI is hourly (24 points). We stretch it to fit the width.
+      // We scale GHI so that 1000 W/m² (Peak Sun) roughly matches the top of the graph
+      // This allows "Shape Comparison" between Potential vs Actual.
+      const maxGHI = 1000; // Typical peak W/m²
+      
+      irradiancePath = ghiData.map((d, i) => {
+        const x = (i / (ghiData.length - 1)) * width;
+        // Normalize GHI height to match the chart scale
+        const y = height - (d.ghi / maxGHI) * height; 
+        return `${x},${y}`;
+      }).join(' ');
+    }
 
     return (
-      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        {/* Gradient Definition */}
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{overflow: 'visible'}}>
         <defs>
           <linearGradient id="solarGradient" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#FFD700" stopOpacity="0.5" />
             <stop offset="100%" stopColor="#FFD700" stopOpacity="0.0" />
           </linearGradient>
         </defs>
-        {/* The Area Fill */}
-        <path d={areaPath} fill="url(#solarGradient)" />
-        {/* The Line */}
-        <polyline points={points} fill="none" stroke="#FFD700" strokeWidth="2" />
+
+        {/* The Solar Area (Gold) */}
+        <path d={solarAreaPath} fill="url(#solarGradient)" />
+        <polyline points={solarPoints} fill="none" stroke="#FFD700" strokeWidth="2" />
+
+        {/* The Irradiance Line (White Dotted) */}
+        {irradiancePath && (
+          <polyline 
+            points={irradiancePath} 
+            fill="none" 
+            stroke="#FFFFFF" 
+            strokeWidth="1.5" 
+            strokeDasharray="4,4" 
+            opacity="0.5"
+          />
+        )}
       </svg>
     );
   };
@@ -99,7 +128,7 @@ export default function Home() {
       {/* --- POWER FLOW DIAGRAM --- */}
       <div style={styles.diagram}>
         
-        {/* NEW: IRRADIANCE MODULE (Top Left Corner) */}
+        {/* IRRADIANCE MODULE (Top Left) */}
         {irradiance && (
           <div style={{
             position: 'absolute', 
@@ -110,10 +139,10 @@ export default function Home() {
           }}>
             <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Sky Intensity</span>
             <div style={{ fontSize: '18px', color: '#FFD700', fontWeight: 'bold' }}>
-              {Math.round(irradiance.ghi)} W/m²
+              {Math.round(irradiance.current_ghi)} W/m²
             </div>
             <div style={{ fontSize: '10px', color: '#555' }}>
-               {irradiance.ghi > 800 ? "Peak Sun" : irradiance.ghi > 200 ? "Cloudy/Mixed" : "Low Light"}
+               {irradiance.current_ghi > 800 ? "Peak Sun" : irradiance.current_ghi > 200 ? "Cloudy/Mixed" : "Low Light"}
             </div>
           </div>
         )}
@@ -155,9 +184,16 @@ export default function Home() {
         </svg>
       </div>
 
-      {/* --- NEW SOLAR GRAPH MODULE --- */}
+      {/* --- SOLAR GRAPH MODULE --- */}
       <div style={styles.graphContainer}>
-        <h3 style={{color: '#888', margin: '0 0 10px 0', fontSize: '14px'}}>Solar Output (24h)</h3>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+          <h3 style={{color: '#888', margin: 0, fontSize: '14px'}}>Solar Output (24h)</h3>
+          <div style={{fontSize:'10px', color:'#555'}}>
+             <span style={{color:'#FFD700', marginRight:'10px'}}>— Actual</span>
+             <span style={{color:'#999'}}>--- Sky Potential</span>
+          </div>
+        </div>
+        
         <div style={{width: '100%', height: '100px', borderBottom: '1px solid #333'}}>
            {renderGraph()}
         </div>
@@ -185,7 +221,7 @@ const styles = {
   title: { color: '#888', fontSize: '20px', marginBottom: '5px' },
   timestamp: { color: '#555', fontSize: '12px', marginBottom: '40px' },
   diagram: {
-    position: 'relative', width: '100%', maxWidth: '500px', height: '300px', // Reduced height slightly
+    position: 'relative', width: '100%', maxWidth: '500px', height: '300px',
     border: '1px solid #222', borderRadius: '20px', backgroundColor: '#1a1a1a', marginBottom: '20px'
   },
   node: {
@@ -197,7 +233,6 @@ const styles = {
   label: { fontSize: '10px', color: '#888' },
   svg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' },
   
-  // New Styles for Graph
   graphContainer: {
     width: '100%', maxWidth: '500px', padding: '20px', backgroundColor: '#1a1a1a',
     borderRadius: '20px', border: '1px solid #222'
