@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function Home() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState(null);
+  const [irradiance, setIrradiance] = useState(null); // <--- NEW STATE
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -18,6 +19,17 @@ export default function Home() {
         const histJson = await histRes.json();
         if (histRes.ok) setHistory(histJson.solarData);
       }
+
+      // 3. Fetch Irradiance Data (NEW)
+      // We wrap this in its own try/catch so weather errors don't break the energy dash
+      try {
+        const weatherRes = await fetch('/api/weather/irradiance');
+        const weatherJson = await weatherRes.json();
+        if (weatherRes.ok) setIrradiance(weatherJson);
+      } catch (e) {
+        console.warn("Weather fetch failed:", e);
+      }
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -86,6 +98,26 @@ export default function Home() {
 
       {/* --- POWER FLOW DIAGRAM --- */}
       <div style={styles.diagram}>
+        
+        {/* NEW: IRRADIANCE MODULE (Top Left Corner) */}
+        {irradiance && (
+          <div style={{
+            position: 'absolute', 
+            top: '15px', 
+            left: '15px', 
+            textAlign: 'left',
+            zIndex: 5
+          }}>
+            <span style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>Sky Intensity</span>
+            <div style={{ fontSize: '18px', color: '#FFD700', fontWeight: 'bold' }}>
+              {Math.round(irradiance.ghi)} W/m²
+            </div>
+            <div style={{ fontSize: '10px', color: '#555' }}>
+               {irradiance.ghi > 800 ? "Peak Sun" : irradiance.ghi > 200 ? "Cloudy/Mixed" : "Low Light"}
+            </div>
+          </div>
+        )}
+
         {/* SOLAR */}
         <div style={{...styles.node, top: '0', left: '50%', transform: 'translateX(-50%)'}}>
           <span style={styles.icon}>☀️</span>
