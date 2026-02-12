@@ -7,7 +7,7 @@ const COLORS = {
   white: '#FFFFFF',
   silver: '#BEC0C2',
   bg: '#0B162A',        // Deep Navy Background
-  panel: '#15243b',     // Slightly lighter navy for boxes
+  panel: 'rgba(21, 36, 59, 0.8)', // Semi-transparent Navy
   danger: '#FF3B30'     // Keep Red for "Low Battery" warnings
 };
 
@@ -241,7 +241,7 @@ export default function Home() {
         @keyframes flow { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
         .flow-line { stroke-dasharray: 10; animation: flow 1s linear infinite; }
         .flow-line-reverse { stroke-dasharray: 10; animation: flow 1s linear infinite reverse; }
-        body { background-color: ${COLORS.bg}; margin: 0; }
+        body { margin: 0; background-color: ${COLORS.bg}; }
       `}</style>
     </div>
   );
@@ -249,10 +249,16 @@ export default function Home() {
 
 const styles = {
   container: {
+    // --- BACKGROUND IMAGE UPDATE ---
     backgroundColor: COLORS.bg, 
+    backgroundImage: `linear-gradient(rgba(11, 22, 42, 0.85), rgba(11, 22, 42, 0.85)), url("/background.webp")`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed', // Parallax effect
+    // -------------------------------
     color: COLORS.white, 
     minHeight: '100vh', 
-    fontFamily: 'Helvetica Neue, Arial, sans-serif', // Clean, sporty font
+    fontFamily: 'Helvetica Neue, Arial, sans-serif',
     display: 'flex', 
     flexDirection: 'column', 
     alignItems: 'center', 
@@ -264,7 +270,7 @@ const styles = {
     marginBottom: '5px', 
     fontWeight: '900', 
     letterSpacing: '2px',
-    textShadow: `2px 2px 0px ${COLORS.blue}` // 3D Effect
+    textShadow: `2px 2px 0px ${COLORS.blue}` 
   },
   timestamp: { color: COLORS.silver, fontSize: '12px', marginBottom: '40px', letterSpacing: '1px' },
   diagram: {
@@ -276,12 +282,13 @@ const styles = {
     borderRadius: '10px', 
     backgroundColor: COLORS.panel, 
     marginBottom: '20px',
-    boxShadow: `0 0 15px ${COLORS.blue}40` // Blue Glow
+    boxShadow: `0 0 15px ${COLORS.blue}40`,
+    backdropFilter: 'blur(5px)' // Blurs background behind the box
   },
   node: {
     position: 'absolute', 
     textAlign: 'center', 
-    backgroundColor: COLORS.bg, 
+    backgroundColor: 'rgba(11, 22, 42, 0.9)', 
     padding: '10px',
     borderRadius: '8px', 
     borderWidth: '2px',
@@ -300,7 +307,8 @@ const styles = {
     padding: '20px', 
     backgroundColor: COLORS.panel,
     borderRadius: '10px', 
-    border: `2px solid ${COLORS.orange}`, // Orange Border for Graph
-    boxShadow: `0 0 15px ${COLORS.orange}40` // Orange Glow
+    border: `2px solid ${COLORS.orange}`,
+    boxShadow: `0 0 15px ${COLORS.orange}40`,
+    backdropFilter: 'blur(5px)'
   }
 };
