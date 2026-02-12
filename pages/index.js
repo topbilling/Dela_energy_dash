@@ -234,4 +234,23 @@ const styles = {
     backgroundColor: '#111', color: '#eee', minHeight: '100vh', fontFamily: 'sans-serif',
     display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px',
   },
-  title: { color: '#888', fontSize: '20px', marginBottom: '5px'
+  title: { color: '#888', fontSize: '20px', marginBottom: '5px' },
+  timestamp: { color: '#555', fontSize: '12px', marginBottom: '40px' },
+  diagram: {
+    position: 'relative', width: '100%', maxWidth: '500px', height: '300px',
+    border: '1px solid #222', borderRadius: '20px', backgroundColor: '#1a1a1a', marginBottom: '20px'
+  },
+  node: {
+    position: 'absolute', textAlign: 'center', backgroundColor: '#222', padding: '10px',
+    borderRadius: '10px', border: '1px solid #333', minWidth: '80px',
+  },
+  icon: { fontSize: '24px', display: 'block', marginBottom: '5px' },
+  value: { fontSize: '16px', fontWeight: 'bold', color: '#fff' },
+  label: { fontSize: '10px', color: '#888' },
+  svg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' },
+  
+  graphContainer: {
+    width: '100%', maxWidth: '500px', padding: '20px', backgroundColor: '#1a1a1a',
+    borderRadius: '20px', border: '1px solid #222'
+  }
+};
