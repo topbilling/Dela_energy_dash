@@ -2,9 +2,9 @@ export const config = { runtime: 'nodejs' };
 
 export default async function handler(req, res) {
   try {
-    // DIRECT ACCESS: Use the valid token we already have in Vercel
+    // 1. Hit the "Products" endpoint (We know this works!)
     const response = await fetch(
-      `https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/energy_sites/${process.env.TESLA_SITE_ID}/site_status`,
+      'https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/products',
       {
         method: 'GET',
         headers: { 
@@ -20,10 +20,19 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    
-    // Send the battery percentage to your dashboard
+
+    // 2. Find the Battery in the list
+    // We look for "resource_type": "battery"
+    const battery = data.response.find(item => item.resource_type === 'battery');
+
+    if (!battery) {
+      throw new Error('No Powerwall found in Tesla account');
+    }
+
+    // 3. Return the percentage
     res.status(200).json({ 
-      battery_level: data.response.percentage_charged, 
+      site_name: battery.site_name,
+      battery_level: battery.percentage_charged, 
       status: "Active",
       timestamp: new Date().toISOString() 
     });
