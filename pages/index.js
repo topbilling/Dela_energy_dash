@@ -251,7 +251,7 @@ const styles = {
   container: {
     // --- BACKGROUND IMAGE UPDATE ---
     backgroundColor: COLORS.bg, 
-    backgroundImage: `linear-gradient(rgba(11, 22, 42, 0.85), rgba(11, 22, 42, 0.85)), url("/background.webp")`,
+    backgroundImage: `linear-gradient(rgba(11, 22, 42, 0.85), rgba(11, 22, 42, 0.35)), url("/background.webp")`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed', // Parallax effect
