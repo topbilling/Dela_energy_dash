@@ -5,6 +5,9 @@ export default async function handler(req, res) {
   const REFRESH_TOKEN = process.env.TESLA_REFRESH_TOKEN;
   const SITE_ID = '2715465'; 
   const BASE_URL = 'https://owner-api.teslamotors.com';
+  
+  // --- THE FIX: Lock the server's formatting to Eastern Time ---
+  const TIMEZONE = 'America/New_York';
 
   const fetchData = async (accessToken) => {
     return fetch(
@@ -52,11 +55,10 @@ export default async function handler(req, res) {
     const data = await teslaRes.json();
     const timeSeries = data.response?.time_series || [];
     
-    // --- THE BUCKETING & GRANULARITY ENGINE ---
+    // --- BUCKETING WITH EASTERN TIMEZONE ---
     let formatted = [];
 
     if (period === 'day') {
-        // Force exactly 24 hourly bars (Midnight to 11 PM)
         formatted = Array.from({ length: 24 }, (_, i) => ({
             label: `${i}:00`,
             sold: 0, consumed: 0, purchased: 0
@@ -64,9 +66,15 @@ export default async function handler(req, res) {
 
         timeSeries.forEach(item => {
             const date = new Date(item.timestamp);
-            const hour = date.getHours(); // 0 to 23
             
-            // Tesla returns Wh, divide by 1000 for kWh
+            // Extract the exact hour (0-23) in Eastern Time
+            const hourString = date.toLocaleTimeString('en-US', { 
+                timeZone: TIMEZONE, 
+                hour: 'numeric', 
+                hour12: false 
+            });
+            const hour = parseInt(hourString, 10) % 24;
+            
             formatted[hour].sold += (item.solar_energy_exported || 0) / 1000;
             formatted[hour].purchased += (item.grid_energy_imported || 0) / 1000;
             formatted[hour].consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
@@ -74,7 +82,7 @@ export default async function handler(req, res) {
     } 
     else if (period === 'week') {
         formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { weekday: 'short' }),
+            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, weekday: 'short' }),
             sold: (item.solar_energy_exported || 0) / 1000,
             consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
             purchased: (item.grid_energy_imported || 0) / 1000
@@ -82,7 +90,7 @@ export default async function handler(req, res) {
     }
     else if (period === 'month') {
         formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, month: 'short', day: 'numeric' }),
             sold: (item.solar_energy_exported || 0) / 1000,
             consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
             purchased: (item.grid_energy_imported || 0) / 1000
@@ -90,7 +98,7 @@ export default async function handler(req, res) {
     }
     else if (period === 'year') {
         formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short' }),
+            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, month: 'short' }),
             sold: (item.solar_energy_exported || 0) / 1000,
             consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
             purchased: (item.grid_energy_imported || 0) / 1000
@@ -98,7 +106,7 @@ export default async function handler(req, res) {
     }
     else if (period === 'life') {
         formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).getFullYear().toString(),
+            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, year: 'numeric' }),
             sold: (item.solar_energy_exported || 0) / 1000,
             consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
             purchased: (item.grid_energy_imported || 0) / 1000
