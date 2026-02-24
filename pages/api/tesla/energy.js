@@ -4,10 +4,10 @@ export const config = { runtime: 'nodejs' };
 
 export default async function handler(req, res) {
   try {
-    // 1. Get Access Token (Check KV Cache First, fallback to Env Var)
-    let accessToken = await kv.get('tesla_access_token') || process.env.TESLA_ACCESS_TOKEN;
+    // 1. Look for a brand new "v2" key in KV, fallback to Env Var
+    let accessToken = await kv.get('tesla_access_v2') || process.env.TESLA_ACCESS_TOKEN;
 
-    // 2. We do a quick test fetch to see if the token is actually alive
+    // 2. Test the token
     let liveResponse = await fetch(
       'https://owner-api.teslamotors.com/api/1/energy_sites/2715465/live_status',
       {
@@ -18,12 +18,12 @@ export default async function handler(req, res) {
       }
     );
 
-    // 3. If token is missing or dead (401), execute the refresh!
+    // 3. Refresh Logic
     if (!accessToken || liveResponse.status === 401) {
       console.log("Token dead or missing. Refreshing via KV/Env...");
       
-      // Pull backup refresh token from KV, or fallback to the Env Var we just saved
-      const refreshToken = await kv.get('tesla_refresh_token') || process.env.TESLA_REFRESH_TOKEN;
+      // Look for the "v2" refresh key
+      const refreshToken = await kv.get('tesla_refresh_v2') || process.env.TESLA_REFRESH_TOKEN;
       if (!refreshToken) throw new Error('No refresh token found anywhere.');
 
       const tokenResponse = await fetch('https://auth.tesla.com/oauth2/v3/token', {
@@ -39,12 +39,12 @@ export default async function handler(req, res) {
       const tokenData = await tokenResponse.json();
       if (!tokenData.access_token) throw new Error('Tesla Auth Failed. Token generator output invalid.');
 
-      // Save new tokens to KV so it stays fast for the next 7 hours
-      await kv.set('tesla_refresh_token', tokenData.refresh_token);
-      await kv.set('tesla_access_token', tokenData.access_token, { ex: 25200 });
+      // Save the NEW tokens under the new "v2" names
+      await kv.set('tesla_refresh_v2', tokenData.refresh_token);
+      await kv.set('tesla_access_v2', tokenData.access_token, { ex: 25200 });
       accessToken = tokenData.access_token;
 
-      // Retry the live data fetch with the shiny new key
+      // Retry the fetch
       liveResponse = await fetch(
         'https://owner-api.teslamotors.com/api/1/energy_sites/2715465/live_status',
         {
