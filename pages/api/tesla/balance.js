@@ -107,4 +107,91 @@ export default async function handler(req, res) {
             if (target) {
                 target.sold += (item.solar_energy_exported || 0) / 1000;
                 target.purchased += (item.grid_energy_imported || 0) / 1000;
-                target.consumed += Math.max(0, ((item.home_energy_total || 0
+                target.consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
+            }
+        });
+    }
+    else if (period === 'month') {
+        // Current Calendar Month (Day 1 to Last Day of this month)
+        const year = nowET.getFullYear();
+        const month = nowET.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const d = new Date(year, month, i);
+            formatted.push({
+                label: `${d.toLocaleDateString('en-US', { month: 'short' })} ${i}`,
+                matchDate: getMatchDate(d),
+                sold: 0, consumed: 0, purchased: 0
+            });
+        }
+
+        timeSeries.forEach(item => {
+            const etDateStr = new Date(item.timestamp).toLocaleString('en-US', { timeZone: TIMEZONE });
+            const etDate = new Date(etDateStr);
+            const matchString = getMatchDate(etDate);
+
+            const target = formatted.find(f => f.matchDate === matchString);
+            if (target) {
+                target.sold += (item.solar_energy_exported || 0) / 1000;
+                target.purchased += (item.grid_energy_imported || 0) / 1000;
+                target.consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
+            }
+        });
+    }
+    else if (period === 'year') {
+        // Last 12 Months ending this month
+        const currentYear = nowET.getFullYear();
+        const currentMonth = nowET.getMonth();
+
+        for (let i = 11; i >= 0; i--) {
+            let d = new Date(currentYear, currentMonth - i, 1);
+            formatted.push({
+                label: d.toLocaleDateString('en-US', { month: 'short' }),
+                matchMonth: d.getMonth(),
+                matchYear: d.getFullYear(),
+                sold: 0, consumed: 0, purchased: 0
+            });
+        }
+
+        timeSeries.forEach(item => {
+            const etDateStr = new Date(item.timestamp).toLocaleString('en-US', { timeZone: TIMEZONE });
+            const etDate = new Date(etDateStr);
+            
+            const target = formatted.find(f => f.matchMonth === etDate.getMonth() && f.matchYear === etDate.getFullYear());
+            if (target) {
+                target.sold += (item.solar_energy_exported || 0) / 1000;
+                target.purchased += (item.grid_energy_imported || 0) / 1000;
+                target.consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
+            }
+        });
+    }
+    else if (period === 'life') {
+        // Yearly Data Since Inception
+        const lifeMap = {};
+        timeSeries.forEach(item => {
+            const etDateStr = new Date(item.timestamp).toLocaleString('en-US', { timeZone: TIMEZONE });
+            const etDate = new Date(etDateStr);
+            const year = etDate.getFullYear().toString();
+            
+            if (!lifeMap[year]) {
+                lifeMap[year] = { label: year, matchYear: parseInt(year), sold: 0, consumed: 0, purchased: 0 };
+            }
+            lifeMap[year].sold += (item.solar_energy_exported || 0) / 1000;
+            lifeMap[year].purchased += (item.grid_energy_imported || 0) / 1000;
+            lifeMap[year].consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
+        });
+        
+        formatted = Object.values(lifeMap).sort((a, b) => a.matchYear - b.matchYear);
+    }
+
+    // Clean up temporary matching fields before sending to the chart
+    const cleanData = formatted.map(({ label, sold, consumed, purchased }) => ({ label, sold, consumed, purchased }));
+
+    res.status(200).json(cleanData);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+}
