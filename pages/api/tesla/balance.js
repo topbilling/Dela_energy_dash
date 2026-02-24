@@ -6,7 +6,6 @@ export default async function handler(req, res) {
   const SITE_ID = '2715465'; 
   const BASE_URL = 'https://owner-api.teslamotors.com';
   
-  // --- THE FIX: Lock the server's formatting to Eastern Time ---
   const TIMEZONE = 'America/New_York';
 
   const fetchData = async (accessToken) => {
@@ -55,68 +54,30 @@ export default async function handler(req, res) {
     const data = await teslaRes.json();
     const timeSeries = data.response?.time_series || [];
     
-    // --- BUCKETING WITH EASTERN TIMEZONE ---
+    // Helper to accurately extract Eastern Time dates
+    const parseET = (timestamp) => new Date(new Date(timestamp).toLocaleString('en-US', { timeZone: TIMEZONE }));
+    
+    // Get "Now" in Eastern Time
+    const nowStr = new Date().toLocaleString('en-US', { timeZone: TIMEZONE });
+    const now = new Date(nowStr);
+
     let formatted = [];
 
+    // --- STRICT BUCKETING ---
+
     if (period === 'day') {
+        // 24 Hours: Midnight to 11 PM
         formatted = Array.from({ length: 24 }, (_, i) => ({
-            label: `${i}:00`,
-            sold: 0, consumed: 0, purchased: 0
+            label: `${i}:00`, sold: 0, consumed: 0, purchased: 0
         }));
 
         timeSeries.forEach(item => {
-            const date = new Date(item.timestamp);
-            
-            // Extract the exact hour (0-23) in Eastern Time
-            const hourString = date.toLocaleTimeString('en-US', { 
-                timeZone: TIMEZONE, 
-                hour: 'numeric', 
-                hour12: false 
-            });
-            const hour = parseInt(hourString, 10) % 24;
-            
+            const etDate = parseET(item.timestamp);
+            const hour = etDate.getHours(); 
             formatted[hour].sold += (item.solar_energy_exported || 0) / 1000;
             formatted[hour].purchased += (item.grid_energy_imported || 0) / 1000;
             formatted[hour].consumed += Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000;
         });
     } 
     else if (period === 'week') {
-        formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, weekday: 'short' }),
-            sold: (item.solar_energy_exported || 0) / 1000,
-            consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
-            purchased: (item.grid_energy_imported || 0) / 1000
-        }));
-    }
-    else if (period === 'month') {
-        formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, month: 'short', day: 'numeric' }),
-            sold: (item.solar_energy_exported || 0) / 1000,
-            consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
-            purchased: (item.grid_energy_imported || 0) / 1000
-        }));
-    }
-    else if (period === 'year') {
-        formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, month: 'short' }),
-            sold: (item.solar_energy_exported || 0) / 1000,
-            consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
-            purchased: (item.grid_energy_imported || 0) / 1000
-        }));
-    }
-    else if (period === 'life') {
-        formatted = timeSeries.map(item => ({
-            label: new Date(item.timestamp).toLocaleDateString('en-US', { timeZone: TIMEZONE, year: 'numeric' }),
-            sold: (item.solar_energy_exported || 0) / 1000,
-            consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
-            purchased: (item.grid_energy_imported || 0) / 1000
-        }));
-    }
-
-    res.status(200).json(formatted);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-}
+        // Exactly Last 7 Days
