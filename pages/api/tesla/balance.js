@@ -1,10 +1,11 @@
 export default async function handler(req, res) {
   const { period = 'day' } = req.query;
 
-  // Use the variables you just updated in Vercel
   const TOKEN = process.env.TESLA_ACCESS_TOKEN;
   const SITE_ID = '2715465'; 
-  const BASE_URL = 'https://fleet-api.prd.na.vn.cloud.tesla.com';
+  
+  // --- THE FIX: Reverted to the Owner API server that matches your token ---
+  const BASE_URL = 'https://owner-api.teslamotors.com';
 
   try {
     const teslaRes = await fetch(
@@ -19,15 +20,15 @@ export default async function handler(req, res) {
 
     if (!teslaRes.ok) {
         const errorText = await teslaRes.text();
-        return res.status(teslaRes.status).json({ error: "Tesla Fleet API Error", details: errorText });
+        return res.status(teslaRes.status).json({ error: "Tesla API Error", details: errorText });
     }
 
     const data = await teslaRes.json();
     
-    const formatted = data.response.time_series.map(item => ({
+    const formatted = (data.response?.time_series || []).map(item => ({
       label: new Date(item.timestamp).getHours() + ":00",
       sold: (item.solar_energy_exported || 0) / 1000,
-      consumed: Math.max(0, (item.home_energy_total - (item.grid_energy_imported || 0))) / 1000,
+      consumed: Math.max(0, ((item.home_energy_total || 0) - (item.grid_energy_imported || 0))) / 1000,
       purchased: (item.grid_energy_imported || 0) / 1000
     }));
 
