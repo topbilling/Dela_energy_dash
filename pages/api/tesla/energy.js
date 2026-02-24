@@ -50,4 +50,28 @@ export default async function handler(req, res) {
         {
           headers: { 
             'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+    }
+
+    // 4. Send Clean Data
+    const liveData = await liveResponse.json();
+    const d = liveData.response;
+
+    res.status(200).json({ 
+      solar_power: d.solar_power,       
+      grid_power: d.grid_power,         
+      battery_power: d.battery_power,   
+      load_power: d.load_power,         
+      battery_level: d.percentage_charged,
+      island_status: d.island_status,   
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+}
